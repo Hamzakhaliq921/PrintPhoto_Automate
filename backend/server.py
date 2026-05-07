@@ -71,3 +71,9 @@ def remove_background(pil_image: Image.Image) -> Image.Image:
     rgba.putalpha(alpha)
     return rgba
 
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "model_loaded": SESSION is not None})
+
