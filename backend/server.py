@@ -28,3 +28,115 @@ CORS(app)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+# ── Load model ────────────────────────────────────────────────────────────────
+MODEL_PATH = os.path.join(os.path.expanduser("~"), ".u2net", "u2net.onnx")
+SESSION = None
+
+log.info("Loading u2net model via onnxruntime...")
+try:
+    import onnxruntime as ort
+    if not os.path.exists(MODEL_PATH):
+        log.error(f"Model not found at {MODEL_PATH}")
+        log.error("Run this to download it:")
+        log.error("  pip install huggingface_hub")
+        log.error("  python -c \"from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='danielgatis/rembg', filename='u2net.onnx', local_dir=r'C:\\Users\\TLS\\.u2net')\"")
+    else:
+        SESSION = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
+        log.info(f"Model loaded from {MODEL_PATH}. Server ready.")
+except Exception as e:
+    log.error(f"onnxruntime load failed: {e}")
+
+
+def remove_background(pil_image: Image.Image) -> Image.Image:
+    """Run u2net inference directly via onnxruntime."""
+    if SESSION is None:
+        raise RuntimeError("Model not loaded. Check server logs for download instructions.")
+
+    orig_size = pil_image.size
+    img = pil_image.convert("RGB").resize((320, 320))
+    arr = np.array(img, dtype=np.float32) / 255.0
+    arr = (arr - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
+    arr = arr.transpose(2, 0, 1)[np.newaxis].astype(np.float32)
+
+    input_name = SESSION.get_inputs()[0].name
+    outputs = SESSION.run(None, {input_name: arr})
+    mask = outputs[0].squeeze()
+
+    # Normalize mask to 0-1
+    mask = (mask - mask.min()) / (mask.max() - mask.min() + 1e-8)
+
+    # Apply mask as alpha channel
+    rgba = pil_image.convert("RGBA")
+    alpha = Image.fromarray((mask * 255).astype(np.uint8), mode="L").resize(orig_size, Image.LANCZOS)
+    rgba.putalpha(alpha)
+    return rgba
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "model_loaded": SESSION is not None})
+
+
+@app.route("/remove-bg", methods=["POST"])
+def remove_bg():
+    t0 = time.time()
+    try:
+        if request.content_type and "multipart" in request.content_type:
+            if "image" not in request.files:
+                return jsonify({"success": False, "error": "No image file"}), 400
+            img_bytes = request.files["image"].read()
+        elif request.is_json:
+            data = request.get_json()
+            b64 = data.get("image_base64", "")
+            if not b64:
+                return jsonify({"success": False, "error": "No image_base64"}), 400
+            if "," in b64:
+                b64 = b64.split(",", 1)[1]
+            img_bytes = base64.b64decode(b64)
+        else:
+            return jsonify({"success": False, "error": "Unsupported Content-Type"}), 415
+
+        log.info(f"Received image ({len(img_bytes):,} bytes)")
+        input_image = Image.open(io.BytesIO(img_bytes))
+        output_image = remove_background(input_image)
+
+        buf = io.BytesIO()
+        output_image.save(buf, format="PNG", optimize=True)
+        buf.seek(0)
+        result_b64 = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+        elapsed = round(time.time() - t0, 2)
+        log.info(f"Done in {elapsed}s")
+
+        return jsonify({"success": True, "image_base64": result_b64, "processing_time_s": elapsed})
+
+    except Exception as e:
+        log.error(f"Error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/remove-bg/batch", methods=["POST"])
+def remove_bg_batch():
+    if "images" not in request.files:
+        return jsonify({"success": False, "error": "No 'images' field"}), 400
+    files = request.files.getlist("images")
+    results = []
+    for i, f in enumerate(files):
+        t0 = time.time()
+        try:
+            img = Image.open(io.BytesIO(f.read()))
+            out = remove_background(img)
+            buf = io.BytesIO()
+            out.save(buf, format="PNG")
+            b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+            results.append({"index": i, "success": True, "image_base64": b64,
+                            "processing_time_s": round(time.time()-t0, 2)})
+        except Exception as e:
+            results.append({"index": i, "success": False, "error": str(e)})
+    return jsonify({"success": True, "results": results})
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    log.info(f"Starting server on http://localhost:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
