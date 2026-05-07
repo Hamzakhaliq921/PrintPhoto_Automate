@@ -77,3 +77,24 @@ def remove_background(pil_image: Image.Image) -> Image.Image:
 def health():
     return jsonify({"status": "ok", "model_loaded": SESSION is not None})
 
+
+@app.route("/remove-bg", methods=["POST"])
+def remove_bg():
+    t0 = time.time()
+    try:
+        if request.content_type and "multipart" in request.content_type:
+            if "image" not in request.files:
+                return jsonify({"success": False, "error": "No image file"}), 400
+            img_bytes = request.files["image"].read()
+        elif request.is_json:
+            data = request.get_json()
+            b64 = data.get("image_base64", "")
+            if not b64:
+                return jsonify({"success": False, "error": "No image_base64"}), 400
+            if "," in b64:
+                b64 = b64.split(",", 1)[1]
+            img_bytes = base64.b64decode(b64)
+        else:
+            return jsonify({"success": False, "error": "Unsupported Content-Type"}), 415
+
+      
