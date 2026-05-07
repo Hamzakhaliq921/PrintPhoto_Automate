@@ -64,3 +64,10 @@ def remove_background(pil_image: Image.Image) -> Image.Image:
 
     # Normalize mask to 0-1
     mask = (mask - mask.min()) / (mask.max() - mask.min() + 1e-8)
+
+    # Apply mask as alpha channel
+    rgba = pil_image.convert("RGBA")
+    alpha = Image.fromarray((mask * 255).astype(np.uint8), mode="L").resize(orig_size, Image.LANCZOS)
+    rgba.putalpha(alpha)
+    return rgba
+
