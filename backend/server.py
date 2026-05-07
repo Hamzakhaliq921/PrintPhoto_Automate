@@ -97,4 +97,41 @@ def remove_bg():
         else:
             return jsonify({"success": False, "error": "Unsupported Content-Type"}), 415
 
-      
+        log.info(f"Received image ({len(img_bytes):,} bytes)")
+        input_image = Image.open(io.BytesIO(img_bytes))
+        output_image = remove_background(input_image)
+
+        buf = io.BytesIO()
+        output_image.save(buf, format="PNG", optimize=True)
+        buf.seek(0)
+        result_b64 = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+        elapsed = round(time.time() - t0, 2)
+        log.info(f"Done in {elapsed}s")
+
+        return jsonify({"success": True, "image_base64": result_b64, "processing_time_s": elapsed})
+
+    except Exception as e:
+        log.error(f"Error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/remove-bg/batch", methods=["POST"])
+def remove_bg_batch():
+    if "images" not in request.files:
+        return jsonify({"success": False, "error": "No 'images' field"}), 400
+    files = request.files.getlist("images")
+    results = []
+    for i, f in enumerate(files):
+        t0 = time.time()
+        try:
+            img = Image.open(io.BytesIO(f.read()))
+            out = remove_background(img)
+            buf = io.BytesIO()
+            out.save(buf, format="PNG")
+            b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+            results.append({"index": i, "success": True, "image_base64": b64,
+                            "processing_time_s": round(time.time()-t0, 2)})
+        except Exception as e:
+            results.append({"index": i, "success": False, "error": str(e)})
+    return jsonify({"success": True, "results": results})
+
