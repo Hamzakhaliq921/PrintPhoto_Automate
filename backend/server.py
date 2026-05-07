@@ -135,3 +135,8 @@ def remove_bg_batch():
             results.append({"index": i, "success": False, "error": str(e)})
     return jsonify({"success": True, "results": results})
 
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    log.info(f"Starting server on http://localhost:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
