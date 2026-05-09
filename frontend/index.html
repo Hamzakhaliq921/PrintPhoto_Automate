@@ -577,5 +577,51 @@ document.addEventListener('DOMContentLoaded', () => {
   checkServer();
   updateSummary();
 });
+// Final integration: Put it all together
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize all event listeners
+  initFileUpload();
+  initToggles();
+  initColorPicker();
+  checkServer();
+  updateSummary();
+  
+  // Refresh preview when settings change
+  document.getElementById('pageSize').addEventListener('change', refreshPreview);
+  document.getElementById('tBorder').addEventListener('click', refreshPreview);
+  document.getElementById('tGuides').addEventListener('click', refreshPreview);
+});
+
+function initFileUpload() {
+  const fileInput = document.getElementById('fileInput');
+  const zone = document.getElementById('zone');
+  
+  fileInput.addEventListener('change', (e) => loadFiles(Array.from(e.target.files)));
+  
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    loadFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
+  });
+}
+
+function initColorPicker() {
+  const swatches = document.querySelectorAll('.swatch');
+  swatches.forEach(swatch => {
+    swatch.addEventListener('click', () => pickColor(swatch));
+  });
+  
+  const customColor = document.getElementById('customColor');
+  if (customColor) {
+    customColor.addEventListener('change', (e) => pickCustomColor(e.target.value));
+  }
+}
 </script>
 </html>
