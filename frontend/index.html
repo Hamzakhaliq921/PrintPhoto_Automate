@@ -560,5 +560,25 @@ function toast(message, type = 'ok') {
   toastEl.style.display = 'flex';
   setTimeout(() => toastEl.style.display = 'none', 3500);
 } 
+// Step 11: Add toggle controls for additional options
+
+// HTML for toggles (included in main HTML)
+// JavaScript to handle toggle states
+function initToggles() {
+  const toggles = ['tBorder', 'tGuides', 'tRepeat'];
+  toggles.forEach(id => {
+    const toggle = document.getElementById(id);
+    if (toggle) {
+      toggle.addEventListener('click', () => toggle.classList.toggle('on'));
+    }
+  });
+}
+
+// Call this on page load
+document.addEventListener('DOMContentLoaded', () => {
+  initToggles();
+  checkServer();
+  updateSummary();
+});
 </script>
 </html>
