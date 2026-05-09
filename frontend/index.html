@@ -4,11 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PhotoPrint Pro — Passport & ID Photo Generator</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <style>
-    /* Basic reset and CSS variables */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
@@ -23,6 +22,7 @@
       --danger: #ff5e5e;
       --radius: 12px;
       --radius-lg: 18px;
+      --server: http://localhost:5000;
     }
 
     body {
@@ -32,7 +32,7 @@
       min-height: 100vh;
     }
 
-    /* Header styles */
+    /* ── Header ─────────────────────────────────────────────────────── */
     header {
       display: flex;
       align-items: center;
@@ -55,7 +55,29 @@
     }
     .logo span { color: var(--text); }
 
-    /* Layout grid */
+    .server-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: border-color .2s;
+    }
+    .server-status:hover { border-color: var(--border2); }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--muted);
+      transition: background .3s;
+    }
+    .status-dot.online  { background: #4ade80; box-shadow: 0 0 6px #4ade8088; }
+    .status-dot.offline { background: var(--danger); }
+
+    /* ── Layout ─────────────────────────────────────────────────────── */
     .layout {
       display: grid;
       grid-template-columns: 1fr 380px;
@@ -75,7 +97,7 @@
       background: var(--surface);
     }
 
-    /* Section titles */
+    /* ── Section titles ──────────────────────────────────────────────── */
     .section-title {
       font-family: 'Syne', sans-serif;
       font-size: 11px;
@@ -88,6 +110,351 @@
 
     .section { margin-bottom: 36px; }
 
+    /* ── Upload zone ─────────────────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 52px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(200,240,85,0.03);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: var(--surface2); border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px; font-size: 24px;
+    }
+    .upload-zone h3 { font-size: 17px; font-weight: 500; margin-bottom: 6px; }
+    .upload-zone p  { font-size: 13px; color: var(--muted); }
+
+    /* ── Image grid ──────────────────────────────────────────────────── */
+    .img-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .img-card {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border2);
+      background: var(--surface2);
+    }
+    .img-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .img-card .del {
+      position: absolute; top: 5px; right: 5px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(0,0,0,.7); border: none;
+      color: #fff; font-size: 13px; line-height: 22px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .img-card .del:hover { background: var(--danger); }
+    .img-card .edit-btn {
+      position: absolute; top: 5px; left: 5px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(0,0,0,.7); border: none;
+      color: #fff; font-size: 11px; line-height: 22px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .img-card .edit-btn:hover { background: var(--accent); color: #000; }
+    .img-card .overlay {
+      position: absolute; inset: 0;
+      background: rgba(14,14,15,.8);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: 11px; color: var(--accent); gap: 6px;
+    }
+    .img-card .state-badge {
+      position: absolute; bottom: 5px; left: 5px;
+      font-size: 9px; padding: 2px 6px; border-radius: 4px;
+      font-weight: 600; letter-spacing: .3px;
+    }
+    .state-badge.raw  { background: rgba(136,133,128,.2); color: var(--muted); }
+    .state-badge.done { background: rgba(200,240,85,.15); color: var(--accent); }
+
+    /* ── Spinner ─────────────────────────────────────────────────────── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(200,240,85,.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Size presets ────────────────────────────────────────────────── */
+    .size-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .size-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 8px; cursor: pointer;
+      text-align: center; transition: all .15s; color: var(--muted);
+    }
+    .size-btn:hover { border-color: var(--border2); color: var(--text); }
+    .size-btn.sel {
+      border-color: var(--accent);
+      background: rgba(200,240,85,.06);
+      color: var(--accent);
+    }
+    .size-btn .sn { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+    .size-btn .sd { font-size: 11px; color: var(--muted); }
+
+    /* ── Layout picker ───────────────────────────────────────────────── */
+    .layout-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .lay-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 6px; cursor: pointer;
+      text-align: center; transition: all .15s; color: var(--muted);
+    }
+    .lay-btn:hover { border-color: var(--border2); color: var(--text); }
+    .lay-btn.sel {
+      border-color: var(--accent);
+      background: rgba(200,240,85,.06);
+      color: var(--accent);
+    }
+    .grid-thumb {
+      display: grid; gap: 2px;
+      width: 36px; height: 36px;
+      margin: 0 auto 6px;
+    }
+    .grid-thumb span {
+      background: currentColor; border-radius: 2px; opacity: .4;
+    }
+    .lay-btn.sel .grid-thumb span { opacity: 1; }
+    .lay-count { font-size: 13px; font-weight: 500; }
+
+    /* ── Select & toggle ─────────────────────────────────────────────── */
+    label.field-label {
+      display: block; font-size: 12px;
+      color: var(--muted); margin-bottom: 8px; letter-spacing: .3px;
+    }
+    select.field {
+      width: 100%;
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 8px; color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 14px;
+      padding: 10px 12px; appearance: none; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888580'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      transition: border-color .15s;
+    }
+    select.field:focus { outline: none; border-color: var(--accent); }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .toggle-row:last-child { border-bottom: none; }
+    .tl { font-size: 13px; color: var(--muted); }
+    .toggle {
+      width: 36px; height: 20px;
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 999px; cursor: pointer; position: relative; transition: background .2s; flex-shrink: 0;
+    }
+    .toggle.on { background: var(--accent); border-color: var(--accent); }
+    .toggle::after {
+      content: ''; position: absolute;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #fff; top: 2px; left: 2px; transition: transform .2s;
+    }
+    .toggle.on::after { transform: translateX(16px); background: #0e0e0f; }
+
+    /* ── Sidebar cards ───────────────────────────────────────────────── */
+    .s-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 18px; margin-bottom: 16px;
+    }
+    .s-card-title {
+      font-family: 'Syne', sans-serif; font-size: 11px;
+      font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 12px;
+    }
+    .stat-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row .k { color: var(--muted); }
+    .stat-row .v { font-weight: 500; }
+    .stat-row .v.accent { color: var(--accent); }
+
+    /* ── Progress bar ────────────────────────────────────────────────── */
+    .prog-wrap {
+      height: 3px; background: var(--border); border-radius: 3px;
+      overflow: hidden; margin-top: 10px;
+    }
+    .prog-bar {
+      height: 100%; background: var(--accent);
+      border-radius: 3px; transition: width .4s ease; width: 0%;
+    }
+
+    /* ── Buttons ─────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 22px; border-radius: 10px;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+      cursor: pointer; border: none; transition: all .15s;
+    }
+    .btn-primary {
+      background: var(--accent); color: #0e0e0f; width: 100%;
+    }
+    .btn-primary:hover { background: #d4f568; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border2); width: 100%;
+    }
+    .btn-secondary:hover { background: var(--surface); }
+    .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
+
+    .btn-row { display: flex; flex-direction: column; gap: 10px; }
+
+    /* ── Info note ───────────────────────────────────────────────────── */
+    .note {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: rgba(200,240,85,.05); border: 1px solid rgba(200,240,85,.15);
+      border-radius: 10px; padding: 12px 14px; font-size: 12px; color: var(--muted);
+      line-height: 1.5; margin-bottom: 12px;
+    }
+    .note strong { color: var(--accent); font-weight: 500; }
+    .note .ni { font-size: 16px; flex-shrink: 0; }
+
+    /* ── Preview canvas ──────────────────────────────────────────────── */
+    .preview-wrap {
+      background: var(--surface2); border-radius: var(--radius);
+      padding: 16px; text-align: center; min-height: 160px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .preview-wrap canvas {
+      max-width: 100%; max-height: 340px;
+      border-radius: 6px; box-shadow: 0 0 0 1px var(--border2);
+    }
+    .preview-placeholder { color: var(--muted); font-size: 13px; }
+
+    /* ── Toast ───────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 12px; padding: 13px 18px;
+      font-size: 13px; display: none; align-items: center; gap: 10px;
+      z-index: 999; max-width: 320px; animation: slideUp .25s ease;
+    }
+    #toast.ok  { border-color: var(--accent); }
+    #toast.err { border-color: var(--danger); }
+    @keyframes slideUp {
+      from { transform: translateY(10px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    /* ── Drag-to-reposition modal ────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; backdrop-filter: blur(6px);
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+    .modal {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 20px; padding: 28px; width: 480px; max-width: 95vw;
+      animation: slideUp2 .2s ease;
+    }
+    @keyframes slideUp2 {
+      from { transform: translateY(16px); opacity:0; }
+      to   { transform: translateY(0);    opacity:1; }
+    }
+
+    .modal-title {
+      font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .modal-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+
+    .editor-wrap {
+      position: relative; border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--border2); margin-bottom: 18px;
+      background: repeating-conic-gradient(#2a2a2d 0% 25%, #1a1a1c 0% 50%) 0 0 / 20px 20px;
+      cursor: grab; user-select: none;
+    }
+    .editor-wrap:active { cursor: grabbing; }
+
+    #editorCanvas {
+      display: block; width: 100%; height: auto;
+    }
+
+    /* Frame overlay drawn via canvas — no extra HTML needed */
+
+    .zoom-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+    }
+    .zoom-row label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .zoom-row input[type=range] {
+      flex: 1; accent-color: var(--accent); cursor: pointer;
+    }
+    .zoom-val { font-size: 12px; color: var(--accent); width: 38px; text-align:right; }
+
+    .modal-btns { display: flex; gap: 10px; }
+    .modal-btns .btn { flex: 1; }
+
+    .edit-hint {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--muted); margin-bottom: 14px;
+    }
+    .edit-hint span { font-size: 15px; }
+
+    /* ── Color swatches ──────────────────────────────────────────────── */
+    .color-swatches {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
+    }
+    .swatch {
+      width: 34px; height: 34px; border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      transition: transform .15s, border-color .15s;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.12);
+    }
+    .swatch:hover { transform: scale(1.15); }
+    .swatch.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+    .swatch-check { font-size: 14px; color: #000; text-shadow: 0 0 3px #fff; }
+    .swatch-custom {
+      background: linear-gradient(135deg,#ff6b6b,#ffd93d,#6bcb77,#4d96ff);
+      font-size: 15px;
+    }
+    .swatch-transparent {
+      background: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 10px 10px;
+      color: #c00; font-weight: 700; font-size: 16px;
+    }
+
     @media (max-width: 860px) {
       .layout { grid-template-columns: 1fr; }
       .side-col { border-top: 1px solid var(--border); }
@@ -97,115 +464,381 @@
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo">Photo<span>Print</span> Pro</div>
-    <div class="server-status" id="aiStatusBadge">
-      <div class="status-dot" id="dot"></div>
-      <span id="status-text">AI Ready</span>
-    </div>
-  </header>
 
-  <div class="layout">
-    <div class="main-col">
-      <!-- Content will go here -->
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">Photo<span>Print</span> Pro</div>
+  <div class="server-status" id="aiStatusBadge">
+    <div class="status-dot" id="dot"></div>
+    <span id="status-text">AI Ready</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ── LEFT: Main controls ─────────────────────────────────────────────── -->
+  <div class="main-col">
+
+    <!-- Upload -->
+    <div class="section">
+      <div class="section-title">01 — Upload Images</div>
+      <div class="upload-zone" id="zone">
+        <input type="file" accept="image/*" multiple id="fileInput" />
+        <div class="upload-icon">🖼</div>
+        <h3>Drop images here</h3>
+        <p>or click to browse · JPG, PNG, WEBP</p>
+      </div>
+      <div class="img-grid" id="imgGrid"></div>
     </div>
-    <div class="side-col">
-      <!-- Sidebar will go here -->
+
+    <!-- Background removal -->
+    <div class="section">
+      <div class="section-title">02 — Remove Background</div>
+
+      <button class="btn btn-secondary" id="removeBgBtn" onclick="removeBackgrounds()" style="margin-bottom:8px;">
+        ✨ Remove Backgrounds
+      </button>
+      <div id="bgLabel" style="font-size:12px;color:var(--muted);text-align:center;">0 images loaded</div>
+      <div class="prog-wrap" id="bgProg" style="display:none;">
+        <div class="prog-bar" id="bgBar"></div>
+      </div>
+    </div>
+
+    <!-- Size presets -->
+    <div class="section">
+      <div class="section-title">03 — Photo Size</div>
+      <div class="size-grid">
+        <div class="size-btn sel" data-w="35" data-h="45" data-name="Passport" onclick="pickSize(this)">
+          <div class="sn">Passport</div><div class="sd">35 × 45 mm</div>
+        </div>
+        <div class="size-btn" data-w="25.4" data-h="25.4" data-name="1×1 inch" onclick="pickSize(this)">
+          <div class="sn">1×1 inch</div><div class="sd">25.4 × 25.4 mm</div>
+        </div>
+        <div class="size-btn" data-w="51" data-h="51" data-name="2×2 inch" onclick="pickSize(this)">
+          <div class="sn">2×2 inch</div><div class="sd">51 × 51 mm</div>
+        </div>
+        <div class="size-btn" data-w="30" data-h="40" data-name="ID Card" onclick="pickSize(this)">
+          <div class="sn">ID Card</div><div class="sd">30 × 40 mm</div>
+        </div>
+        <div class="size-btn" data-w="40" data-h="60" data-name="Visa" onclick="pickSize(this)">
+          <div class="sn">Visa</div><div class="sd">40 × 60 mm</div>
+        </div>
+        <div class="size-btn" data-w="50" data-h="70" data-name="Custom" onclick="pickSize(this)">
+          <div class="sn">Custom</div><div class="sd">50 × 70 mm</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Layout -->
+    <div class="section">
+      <div class="section-title">04 — Photos per Page</div>
+      <div class="layout-grid">
+        <div class="lay-btn" onclick="pickLayout(this,2,2,1)">
+          <div class="grid-thumb" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr;">
+            <span></span><span></span>
+          </div>
+          <div class="lay-count">2</div>
+        </div>
+        <div class="lay-btn sel" onclick="pickLayout(this,4,2,2)">
+          <div class="grid-thumb" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="lay-count">4</div>
+        </div>
+        <div class="lay-btn" onclick="pickLayout(this,6,3,2)">
+          <div class="grid-thumb" style="grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr;">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="lay-count">6</div>
+        </div>
+        <div class="lay-btn" onclick="pickLayout(this,8,4,2)">
+          <div class="grid-thumb" style="grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr;">
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="lay-count">8</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="section">
+      <div class="section-title">05 — Options</div>
+
+      <label class="field-label">Background Color</label>
+      <div class="color-swatches" id="colorSwatches">
+        <div class="swatch sel" data-color="#ffffff" style="background:#ffffff;" title="White" onclick="pickColor(this)"><span class="swatch-check">✓</span></div>
+        <div class="swatch" data-color="#4a90d9" style="background:#4a90d9;" title="Passport Blue" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#87CEEB" style="background:#87CEEB;" title="Sky Blue" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#add8e6" style="background:#add8e6;" title="Light Blue" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#f0f8ff" style="background:#f0f8ff;" title="Alice Blue" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#f5f5dc" style="background:#f5f5dc;" title="Cream" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#ffe4e1" style="background:#ffe4e1;" title="Misty Rose" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#e8f5e9" style="background:#e8f5e9;" title="Light Green" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#fff9c4" style="background:#fff9c4;" title="Light Yellow" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#f3e5f5" style="background:#f3e5f5;" title="Lavender" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#808080" style="background:#808080;" title="Gray" onclick="pickColor(this)"></div>
+        <div class="swatch" data-color="#000000" style="background:#000000;" title="Black" onclick="pickColor(this)"></div>
+        <div class="swatch swatch-custom" title="Pick custom color" onclick="document.getElementById('customColor').click()">
+          <input type="color" id="customColor" value="#ff0000" style="opacity:0;position:absolute;width:0;height:0;" onchange="pickCustomColor(this.value)">
+          🎨
+        </div>
+        <div class="swatch swatch-transparent" data-color="transparent" title="Transparent" onclick="pickColor(this)">✕</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px;" id="colorLabel">Selected: White (#ffffff)</div>
+
+      <div style="margin-bottom:16px;">
+        <label class="field-label">Page Size</label>
+        <select class="field" id="pageSize">
+          <option value="A4">A4 (210 × 297 mm)</option>
+          <option value="Letter">Letter (216 × 279 mm)</option>
+          <option value="A5">A5 (148 × 210 mm)</option>
+        </select>
+      </div>
+      <div class="toggle-row">
+        <span class="tl">White border around each photo</span>
+        <div class="toggle on" id="tBorder" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="tl">Crop guide marks</span>
+        <div class="toggle on" id="tGuides" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="tl">Repeat single image to fill page</span>
+        <div class="toggle" id="tRepeat" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+  </div><!-- /main-col -->
+
+  <!-- ── RIGHT: Sidebar ──────────────────────────────────────────────────── -->
+  <div class="side-col">
+
+    <!-- Summary -->
+    <div class="s-card">
+      <div class="s-card-title">Summary</div>
+      <div class="stat-row"><span class="k">Images loaded</span>  <span class="v" id="sImgs">0</span></div>
+      <div class="stat-row"><span class="k">Processed</span>      <span class="v accent" id="sProc">0</span></div>
+      <div class="stat-row"><span class="k">Photo size</span>     <span class="v" id="sSize">35 × 45 mm</span></div>
+      <div class="stat-row"><span class="k">Layout</span>         <span class="v" id="sLay">4 per page</span></div>
+      <div class="stat-row"><span class="k">Pages needed</span>   <span class="v accent" id="sPages">—</span></div>
+      <div class="stat-row"><span class="k">Output DPI</span>    <span class="v">300 dpi</span></div>
+    </div>
+
+    <!-- Preview -->
+    <div class="s-card">
+      <div class="s-card-title">Layout Preview</div>
+      <div class="preview-wrap" id="prevWrap">
+        <div class="preview-placeholder">Upload images to preview</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="s-card">
+      <div class="s-card-title">Export</div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="refreshPreview()">👁 Refresh Preview</button>
+        <button class="btn btn-primary" id="pdfBtn" onclick="generatePDF()">⬇ Download PDF</button>
+      </div>
+    </div>
+
+  </div><!-- /side-col -->
+</div><!-- /layout -->
+
+<!-- ── Drag-to-reposition modal ───────────────────────────────────────────── -->
+<div class="modal-overlay" id="editorModal" style="display:none;" onclick="closeEditorOnBg(event)">
+  <div class="modal">
+    <div class="modal-title">✋ Adjust Photo Position</div>
+    <div class="modal-sub">Drag the photo to reposition · Scroll or use slider to zoom</div>
+
+    <div class="edit-hint">
+      <span>💡</span> The dashed box shows the exact passport frame crop area
+    </div>
+
+    <div class="editor-wrap" id="editorWrap">
+      <canvas id="editorCanvas"></canvas>
+    </div>
+
+    <div class="zoom-row">
+      <label>Zoom</label>
+      <input type="range" id="zoomSlider" min="50" max="200" value="100" step="1" oninput="onZoom(this.value)">
+      <span class="zoom-val" id="zoomVal">100%</span>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="resetPosition()">↺ Reset</button>
+      <button class="btn btn-secondary" onclick="closeEditor()">Cancel</button>
+      <button class="btn btn-primary" onclick="applyPosition()">✓ Apply</button>
     </div>
   </div>
-</body>
-// Step 2: Add image upload with drag & drop support
-// Add this script after the HTML structure
+</div>
+
+<div id="toast"></div>
 
 <script>
-let images = []; // Array to store uploaded images
+const { jsPDF } = window.jspdf;
+const SERVER = 'http://localhost:5000';
 
-// DOM Elements
-const fileInput = document.getElementById('fileInput');
+let images = [];          // { id, src, processed, name, bgDone }
+let layout = { total:4, cols:2, rows:2 };
+let photoSize = { w:35, h:45, name:'Passport' };
+let selectedColor = '#ffffff';
+
+function pickColor(el) {
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedColor = el.dataset.color;
+  const label = selectedColor === 'transparent' ? 'Transparent' : selectedColor;
+  document.getElementById('colorLabel').textContent = 'Selected: ' + (el.title || label) + ' (' + label + ')';
+}
+
+function pickCustomColor(hex) {
+  selectedColor = hex;
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('sel'));
+  document.querySelector('.swatch-custom').classList.add('sel');
+  document.getElementById('colorLabel').textContent = 'Selected: Custom (' + hex + ')';
+}
+
+// ── Server health ────────────────────────────────────────────────────────────
+async function checkServer() {
+  const dot  = document.getElementById('dot');
+  const text = document.getElementById('status-text');
+  try {
+    const r = await fetch(SERVER + '/health', { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      dot.className  = 'status-dot online';
+      text.textContent = 'AI Ready';
+      return true;
+    }
+  } catch {}
+  dot.className  = 'status-dot offline';
+  text.textContent = 'AI Offline';
+  return false;
+}
+checkServer();
+setInterval(checkServer, 10000);
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.className = type;
+  t.innerHTML = (type==='ok' ? '✅' : '⚠️') + ' <span>' + msg + '</span>';
+  t.style.display = 'flex';
+  clearTimeout(window._t);
+  window._t = setTimeout(() => t.style.display='none', 3500);
+}
+
+// ── Upload ───────────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e =>
+  loadFiles(Array.from(e.target.files)));
+
 const zone = document.getElementById('zone');
-const imgGrid = document.getElementById('imgGrid');
-
-// File upload handler
-fileInput.addEventListener('change', (e) => loadFiles(Array.from(e.target.files)));
-
-// Drag & drop handlers
-zone.addEventListener('dragover', (e) => { 
-  e.preventDefault(); 
-  zone.classList.add('drag-over'); 
-});
-
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
 zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-
-zone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  zone.classList.remove('drag-over');
-  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-  loadFiles(files);
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  loadFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
 });
 
 function loadFiles(files) {
   files.forEach(file => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      images.push({
-        id: Date.now() + Math.random(),
-        src: e.target.result,
-        processed: e.target.result,
-        name: file.name,
-        bgDone: false
-      });
-      renderGrid();
-      updateSummary();
+    reader.onload = e => {
+      images.push({ id: Date.now()+Math.random(), src: e.target.result,
+                    processed: e.target.result, name: file.name, bgDone: false });
+      renderGrid(); updateSummary();
     };
     reader.readAsDataURL(file);
   });
 }
 
 function renderGrid() {
-  imgGrid.innerHTML = '';
+  const grid = document.getElementById('imgGrid');
+  grid.innerHTML = '';
   images.forEach((img, i) => {
-    const card = document.createElement('div');
-    card.className = 'img-card';
-    card.innerHTML = `
-      <img src="${img.processed}" />
-      <button class="del" onclick="deleteImage(${i})">✕</button>
-      <span class="state-badge raw">original</span>
+    const d = document.createElement('div');
+    d.className = 'img-card';
+    d.innerHTML = `
+      <img src="${img.processed}" style="transform: scale(${img.zoom||1}) translate(${(img.offsetX||0)/( img.zoom||1)}px,${(img.offsetY||0)/(img.zoom||1)}px); transform-origin:center;" />
+      <button class="del" onclick="delImg(${i})">✕</button>
+      <button class="edit-btn" onclick="openEditor(${i})" title="Adjust position">✋</button>
+      <span class="state-badge ${img.bgDone ? 'done' : 'raw'}">${img.bgDone ? 'BG removed' : 'original'}</span>
     `;
-    imgGrid.appendChild(card);
+    grid.appendChild(d);
   });
+  document.getElementById('bgLabel').textContent = images.length + ' image' + (images.length!==1?'s':'') + ' loaded';
 }
 
-function deleteImage(i) {
-  images.splice(i, 1);
-  renderGrid();
+function delImg(i) { images.splice(i,1); renderGrid(); updateSummary(); }
+
+// ── Background removal via local rembg server ────────────────────────────────
+async function removeBackgrounds() {
+  if (!images.length) { toast('Upload images first', 'err'); return; }
+
+  const online = await checkServer();
+  if (!online) {
+    toast('Background removal is offline. Please restart the app.', 'err');
+    return;
+  }
+
+  const btn  = document.getElementById('removeBgBtn');
+  const prog = document.getElementById('bgProg');
+  const bar  = document.getElementById('bgBar');
+
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+  prog.style.display = 'block';
+
+  for (let i = 0; i < images.length; i++) {
+    bar.style.width = (i / images.length * 100) + '%';
+    document.getElementById('bgLabel').textContent =
+      'Processing ' + (i+1) + ' / ' + images.length + '...';
+
+    // Mark as processing in UI
+    const cards = document.querySelectorAll('.img-card');
+    if (cards[i]) {
+      cards[i].insertAdjacentHTML('beforeend',
+        '<div class="overlay"><div class="spinner"></div><span>AI processing</span></div>');
+    }
+
+    try {
+      const resp = await fetch(SERVER + '/remove-bg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: images[i].src })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        images[i].processed = data.image_base64;
+        images[i].bgDone = true;
+        images[i].baked = null;
+        images[i].offsetX = 0; images[i].offsetY = 0; images[i].zoom = 1;
+        toast('Image ' + (i+1) + ' done in ' + data.processing_time_s + 's');
+      } else {
+        toast('Image ' + (i+1) + ' failed: ' + data.error, 'err');
+      }
+    } catch(e) {
+      toast('Network error: ' + e.message, 'err');
+    }
+
+    renderGrid();
+  }
+
+  bar.style.width = '100%';
+  setTimeout(() => { prog.style.display='none'; bar.style.width='0%'; }, 1000);
+  btn.disabled = false;
+  btn.textContent = '✨ Remove Backgrounds (Local AI)';
+  refreshPreview();
   updateSummary();
 }
 
-function updateSummary() {
-  document.getElementById('sImgs').textContent = images.length;
-}
-
-let photoSize = { w: 35, h: 45, name: 'Passport' };
-
+// ── Layout / size pickers ────────────────────────────────────────────────────
 function pickSize(el) {
   document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('sel'));
   el.classList.add('sel');
-  photoSize = {
-    w: parseFloat(el.dataset.w),
-    h: parseFloat(el.dataset.h),
-    name: el.dataset.name
-  };
+  photoSize = { w: parseFloat(el.dataset.w), h: parseFloat(el.dataset.h), name: el.dataset.name };
   updateSummary();
 }
-
-// Update summary with size info
-function updateSummary() {
-  document.getElementById('sImgs').textContent = images.length;
-  document.getElementById('sSize').textContent = `${photoSize.w} × ${photoSize.h} mm`;
-}
-// Step 4: Add layout configuration (photos per page)
-
-let layout = { total: 4, cols: 2, rows: 2 };
 
 function pickLayout(el, total, cols, rows) {
   document.querySelectorAll('.lay-btn').forEach(b => b.classList.remove('sel'));
@@ -214,408 +847,448 @@ function pickLayout(el, total, cols, rows) {
   updateSummary();
 }
 
+// ── Summary ──────────────────────────────────────────────────────────────────
 function updateSummary() {
-  document.getElementById('sImgs').textContent = images.length;
-  document.getElementById('sSize').textContent = `${photoSize.w} × ${photoSize.h} mm`;
-  document.getElementById('sLay').textContent = `${layout.total} per page`;
-  
-  const pagesNeeded = images.length > 0 ? Math.ceil(images.length / layout.total) : 0;
-  document.getElementById('sPages').textContent = pagesNeeded || '—';
+  const n = images.length;
+  const proc = images.filter(i => i.bgDone).length;
+  const pages = n > 0 ? Math.ceil(n / layout.total) : 0;
+  document.getElementById('sImgs').textContent  = n;
+  document.getElementById('sProc').textContent  = proc + ' / ' + n;
+  document.getElementById('sSize').textContent  = photoSize.w + ' × ' + photoSize.h + ' mm';
+  document.getElementById('sLay').textContent   = layout.total + ' per page (' + layout.cols + '×' + layout.rows + ')';
+  document.getElementById('sPages').textContent = n > 0 ? pages : '—';
 }
 
-let selectedColor = '#ffffff';
-
-function pickColor(el) {
-  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('sel'));
-  el.classList.add('sel');
-  selectedColor = el.dataset.color;
-  const label = selectedColor === 'transparent' ? 'Transparent' : selectedColor;
-  document.getElementById('colorLabel').textContent = `Selected: ${label}`;
-}
-
-function pickCustomColor(hex) {
-  selectedColor = hex;
-  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('sel'));
-  document.querySelector('.swatch-custom').classList.add('sel');
-  document.getElementById('colorLabel').textContent = `Selected: Custom (${hex})`;
-}
-<!-- Step 6: Add jsPDF library and basic PDF export -->
-
-const { jsPDF } = window.jspdf;
-
-function getPageMM() {
-  const value = document.getElementById('pageSize').value;
-  if (value === 'A4') return { w: 210, h: 297 };
-  if (value === 'Letter') return { w: 216, h: 279 };
-  return { w: 148, h: 210 };
-}
-
-async function generatePDF() {
-  if (!images.length) {
-    alert('Upload at least one image first');
-    return;
-  }
-
-  const page = getPageMM();
-  const pdf = new jsPDF({
-    orientation: page.h > page.w ? 'portrait' : 'landscape',
-    unit: 'mm',
-    format: [page.w, page.h]
-  });
-
-  pdf.save(`photoprint-${Date.now()}.pdf`);
-  alert('PDF generated!');
-}
-
+// ── Canvas preview ───────────────────────────────────────────────────────────
 function refreshPreview() {
   if (!images.length) return;
   const wrap = document.getElementById('prevWrap');
-  wrap.innerHTML = '<canvas id="previewCanvas"></canvas>';
-  drawPreview();
+  wrap.innerHTML = '<canvas id="pc"></canvas>';
+  drawPage(document.getElementById('pc'), 2.2, 0);
 }
 
-function drawPreview() {
-  const canvas = document.getElementById('previewCanvas');
-  if (!canvas) return;
-  
-  const page = getPageMM();
-  const scale = 2.2; // Preview scale
+function getPageMM() {
+  const v = document.getElementById('pageSize').value;
+  if (v==='A4')     return { w:210, h:297 };
+  if (v==='Letter') return { w:216, h:279 };
+  return { w:148, h:210 };
+}
+
+function drawPage(canvas, scale, pageIndex) {
+  const page   = getPageMM();
   const border = document.getElementById('tBorder').classList.contains('on');
-  
-  canvas.width = page.w * scale;
+  const guides = document.getElementById('tGuides').classList.contains('on');
+  const repeat = document.getElementById('tRepeat').classList.contains('on');
+  const bgCol  = selectedColor;
+
+  canvas.width  = page.w * scale;
   canvas.height = page.h * scale;
   const ctx = canvas.getContext('2d');
-  
-  // Draw white background
+
+  // White page
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // Calculate grid positions
+
   const pw = photoSize.w * scale;
   const ph = photoSize.h * scale;
   const gap = 3 * scale;
-  const totalW = layout.cols * pw + (layout.cols - 1) * gap;
-  const totalH = layout.rows * ph + (layout.rows - 1) * gap;
-  const startX = (canvas.width - totalW) / 2;
+  const cols = layout.cols, rows = layout.rows;
+  const totalW = cols*pw + (cols-1)*gap;
+  const totalH = rows*ph + (rows-1)*gap;
+  const startX = (canvas.width  - totalW) / 2;
   const startY = (canvas.height - totalH) / 2;
-  
-  // Draw placeholder rectangles
-  for (let i = 0; i < layout.total && i < images.length; i++) {
-    const row = Math.floor(i / layout.cols);
-    const col = i % layout.cols;
-    const x = startX + col * (pw + gap);
-    const y = startY + row * (ph + gap);
-    
-    ctx.fillStyle = selectedColor;
-    ctx.fillRect(x, y, pw, ph);
-    ctx.strokeStyle = '#ddd';
-    ctx.strokeRect(x, y, pw, ph);
-  }
-}
-const SERVER = 'http://localhost:5000';
 
-async function checkServer() {
-  const dot = document.getElementById('dot');
-  const text = document.getElementById('status-text');
-  try {
-    const response = await fetch(`${SERVER}/health`, { signal: AbortSignal.timeout(3000) });
-    if (response.ok) {
-      dot.className = 'status-dot online';
-      text.textContent = 'AI Ready';
-      return true;
-    }
-  } catch {}
-  dot.className = 'status-dot offline';
-  text.textContent = 'AI Offline';
-  return false;
-}
+  let list = [...images];
+  if (repeat && list.length > 0)
+    while (list.length < layout.total) list.push(list[0]);
 
-async function removeBackgrounds() {
-  if (!images.length) {
-    alert('Upload images first');
-    return;
-  }
+  const offset = pageIndex * layout.total;
+  const pageImgs = list.slice(offset, offset + layout.total);
 
-  const online = await checkServer();
-  if (!online) {
-    alert('Background removal server is offline');
-    return;
-  }
+  // Step 1: Draw ALL backgrounds and guides synchronously (no async)
+  for (let r=0; r<rows; r++) {
+    for (let c=0; c<cols; c++) {
+      const x = startX + c*(pw+gap);
+      const y = startY + r*(ph+gap);
+      const brd = border ? 2*scale : 0;
+      const ix=x+brd, iy=y+brd, iw=pw-2*brd, ih=ph-2*brd;
 
-  const button = document.getElementById('removeBgBtn');
-  button.disabled = true;
-  button.textContent = 'Processing...';
-
-  for (let i = 0; i < images.length; i++) {
-    try {
-      const response = await fetch(`${SERVER}/remove-bg`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_base64: images[i].src })
-      });
-      
-      const data = await response.json();
-      if (data.success) {
-        images[i].processed = data.image_base64;
-        images[i].bgDone = true;
+      // Background color fills the entire photo cell
+      if (bgCol !== 'transparent') {
+        ctx.fillStyle = bgCol;
+        ctx.fillRect(ix, iy, iw, ih);
       }
-    } catch (error) {
-      console.error('Background removal failed:', error);
+
+      if (border) {
+        ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=0.5*scale;
+        ctx.strokeRect(x,y,pw,ph);
+      }
+      if (guides) {
+        ctx.strokeStyle='rgba(180,180,180,0.5)'; ctx.lineWidth=0.4*scale;
+        ctx.setLineDash([3*scale,3*scale]);
+        const g=5*scale;
+        [[x-g,y,x,y],[x+pw,y,x+pw+g,y],[x-g,y+ph,x,y+ph],[x+pw,y+ph,x+pw+g,y+ph],
+         [x,y-g,x,y],[x,y+ph,x,y+ph+g],[x+pw,y-g,x+pw,y],[x+pw,y+ph,x+pw,y+ph+g]]
+        .forEach(([x1,y1,x2,y2])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();});
+        ctx.setLineDash([]);
+      }
     }
   }
 
-  button.disabled = false;
-  button.textContent = '✨ Remove Backgrounds';
-  renderGrid();
-  refreshPreview();
+  // Step 2: Draw all images on top (async, but bg is already painted)
+  const promises = [];
+  for (let r=0; r<rows; r++) {
+    for (let c=0; c<cols; c++) {
+      const idx = r*cols + c;
+      if (idx >= pageImgs.length) continue;
+
+      const x = startX + c*(pw+gap);
+      const y = startY + r*(ph+gap);
+      const brd = border ? 2*scale : 0;
+      const ix=x+brd, iy=y+brd, iw=pw-2*brd, ih=ph-2*brd;
+      const src = pageImgs[idx].baked || pageImgs[idx].processed;
+
+      const p = new Promise(res => {
+        const img = new Image();
+        img.onload = () => {
+          // Image drawn ON TOP of already-painted background
+          const ar=img.width/img.height, tar=iw/ih;
+          let sx=0,sy=0,sw=img.width,sh=img.height;
+          if (ar>tar) { sw=img.height*tar; sx=(img.width-sw)/2; }
+          else        { sh=img.width/tar;  sy=(img.height-sh)/2; }
+          ctx.save();
+          ctx.beginPath(); ctx.rect(ix,iy,iw,ih); ctx.clip();
+          ctx.drawImage(img,sx,sy,sw,sh,ix,iy,iw,ih);
+          ctx.restore();
+          res();
+        };
+        img.onerror = () => res();
+        img.src = src;
+      });
+      promises.push(p);
+    }
+  }
+  return Promise.all(promises);
 }
-let editorIdx = -1;
-let edImg = null;
-let edOffX = 0, edOffY = 0;
+
+// ── PDF generation ───────────────────────────────────────────────────────────
+async function generatePDF() {
+  if (!images.length) { toast('Upload at least one image first', 'err'); return; }
+
+  const btn = document.getElementById('pdfBtn');
+  btn.disabled = true; btn.textContent = '⏳ Building PDF...';
+
+  try {
+    const page   = getPageMM();
+    const border = document.getElementById('tBorder').classList.contains('on');
+    const guides = document.getElementById('tGuides').classList.contains('on');
+    const repeat = document.getElementById('tRepeat').classList.contains('on');
+    const bgCol  = selectedColor;
+
+    const pdf = new jsPDF({
+      orientation: page.h > page.w ? 'portrait' : 'landscape',
+      unit: 'mm', format: [page.w, page.h]
+    });
+
+    let list = [...images];
+    if (repeat && list.length > 0)
+      while (list.length < layout.total) list.push(list[0]);
+
+    const pages = Math.ceil(list.length / layout.total);
+    const pw=photoSize.w, ph=photoSize.h, gap=3;
+    const cols=layout.cols, rows=layout.rows;
+    const totalW = cols*pw+(cols-1)*gap;
+    const totalH = rows*ph+(rows-1)*gap;
+    const startX = (page.w-totalW)/2;
+    const startY = (page.h-totalH)/2;
+
+    for (let pg=0; pg<pages; pg++) {
+      if (pg>0) pdf.addPage([page.w,page.h], page.h>page.w?'portrait':'landscape');
+      const pageImgs = list.slice(pg*layout.total, (pg+1)*layout.total);
+
+      for (let r=0; r<rows; r++) {
+        for (let c=0; c<cols; c++) {
+          const idx = r*cols+c;
+          const x = startX+c*(pw+gap), y = startY+r*(ph+gap);
+          const brd = border ? 1 : 0;
+
+          if (idx < pageImgs.length) {
+            try {
+              const dataUrl = await resizeFor300dpi(pageImgs[idx].baked || pageImgs[idx].processed, pw, ph, border, bgCol);
+              pdf.addImage(dataUrl,'JPEG',x+brd,y+brd,pw-2*brd,ph-2*brd,undefined,'FAST');
+            } catch(e) { console.error(e); }
+          }
+
+          if (border) {
+            pdf.setDrawColor(200,200,200); pdf.setLineWidth(0.3);
+            pdf.rect(x,y,pw,ph,'S');
+          }
+          if (guides) {
+            pdf.setDrawColor(180,180,180); pdf.setLineWidth(0.15);
+            pdf.setLineDashPattern([1,1],0);
+            const g=4;
+            [[x-g,y,x,y],[x+pw,y,x+pw+g,y],[x-g,y+ph,x,y+ph],[x+pw,y+ph,x+pw+g,y+ph],
+             [x,y-g,x,y],[x,y+ph,x,y+ph+g],[x+pw,y-g,x+pw,y],[x+pw,y+ph,x+pw,y+ph+g]]
+            .forEach(([x1,y1,x2,y2]) => pdf.line(x1,y1,x2,y2));
+            pdf.setLineDashPattern([],0);
+          }
+        }
+      }
+    }
+
+    pdf.save('photoprint-' + Date.now() + '.pdf');
+    toast('PDF downloaded!');
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+  }
+
+  btn.disabled = false; btn.textContent = '⬇ Download PDF';
+}
+
+function resizeFor300dpi(src, wMM, hMM, hasBorder, bgCol) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const dpi=300, mpi=25.4;
+      const pw=Math.round(wMM/mpi*dpi), ph=Math.round(hMM/mpi*dpi);
+      const cv=document.createElement('canvas');
+      cv.width=pw; cv.height=ph;
+      const ctx=cv.getContext('2d');
+
+      // Fill background color first
+      if (bgCol && bgCol !== 'transparent') {
+        ctx.fillStyle = bgCol;
+        ctx.fillRect(0,0,pw,ph);
+      }
+
+      const brd=hasBorder?Math.round(dpi*1/mpi):0;
+      const iw=pw-2*brd, ih=ph-2*brd;
+      const ar=img.width/img.height, tar=iw/ih;
+      let sx=0,sy=0,sw=img.width,sh=img.height;
+      if (ar>tar){sw=img.height*tar;sx=(img.width-sw)/2;}
+      else       {sh=img.width/tar; sy=(img.height-sh)/2;}
+      ctx.drawImage(img,sx,sy,sw,sh,brd,brd,iw,ih);
+      resolve(cv.toDataURL('image/jpeg',0.95));
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// ── Drag-to-reposition editor ────────────────────────────────────────────────
+let editorIdx = -1;       // which image is being edited
+let edImg = null;         // loaded HTMLImageElement
+let edCanvas, edCtx;
+let edW, edH;             // canvas pixel size
+let edOffX = 0, edOffY = 0;   // current pixel offset of image centre
 let edZoom = 1;
 let edDragging = false;
+let edDragStartX, edDragStartY, edDragOriginX, edDragOriginY;
 
-function openEditor(index) {
-  editorIdx = index;
-  const img = images[index];
-  edOffX = img.offsetX || 0;
-  edOffY = img.offsetY || 0;
-  edZoom = img.zoom || 1;
-  
+function openEditor(i) {
+  editorIdx = i;
+  const img = images[i];
+
+  // Initialise from saved state
+  edOffX  = img.offsetX || 0;
+  edOffY  = img.offsetY || 0;
+  edZoom  = img.zoom    || 1;
+
   document.getElementById('zoomSlider').value = Math.round(edZoom * 100);
-  document.getElementById('zoomVal').textContent = `${Math.round(edZoom * 100)}%`;
-  
-  const canvas = document.getElementById('editorCanvas');
+  document.getElementById('zoomVal').textContent = Math.round(edZoom * 100) + '%';
+
+  edCanvas = document.getElementById('editorCanvas');
+  edCtx    = edCanvas.getContext('2d');
+
+  // Canvas size: proportional to photoSize, display at 380px wide max
   const aspect = photoSize.h / photoSize.w;
-  canvas.width = 420;
-  canvas.height = Math.round(420 * aspect);
-  
+  edW = 420; edH = Math.round(edW * aspect);
+  edCanvas.width  = edW;
+  edCanvas.height = edH;
+
   edImg = new Image();
-  edImg.onload = () => drawEditor();
+  edImg.onload = () => { drawEditor(); };
   edImg.src = img.processed;
-  
+
+  // Drag events
+  edCanvas.onmousedown  = edMouseDown;
+  edCanvas.onmousemove  = edMouseMove;
+  edCanvas.onmouseup    = edMouseUp;
+  edCanvas.onmouseleave = edMouseUp;
+  edCanvas.onwheel      = edWheel;
+
+  // Touch events
+  edCanvas.ontouchstart = edTouchStart;
+  edCanvas.ontouchmove  = edTouchMove;
+  edCanvas.ontouchend   = edMouseUp;
+
   document.getElementById('editorModal').style.display = 'flex';
 }
 
 function drawEditor() {
-  const canvas = document.getElementById('editorCanvas');
-  const ctx = canvas.getContext('2d');
-  if (!edImg) return;
-  
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  // Draw background
-  ctx.fillStyle = selectedColor;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // Draw image with zoom and offset
-  const baseScale = Math.min(canvas.width / edImg.width, canvas.height / edImg.height);
+  if (!edImg || !edCtx) return;
+  edCtx.clearRect(0, 0, edW, edH);
+
+  // Checkerboard background (shows transparency)
+  edCtx.fillStyle = '#2a2a2d';
+  edCtx.fillRect(0, 0, edW, edH);
+
+  // Draw photo background color
+  if (selectedColor !== 'transparent') {
+    edCtx.fillStyle = selectedColor;
+    edCtx.fillRect(0, 0, edW, edH);
+  }
+
+  // Draw image centred + offset + zoom
+  const baseScale = Math.min(edW / edImg.width, edH / edImg.height);
   const scale = baseScale * edZoom;
-  const drawW = edImg.width * scale;
+  const drawW = edImg.width  * scale;
   const drawH = edImg.height * scale;
-  const cx = canvas.width / 2 + edOffX;
-  const cy = canvas.height / 2 + edOffY;
-  
-  ctx.drawImage(edImg, cx - drawW/2, cy - drawH/2, drawW, drawH);
-  
-  // Draw crop frame
-  ctx.strokeStyle = '#c8f055';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 5]);
-  ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+  const cx = edW / 2 + edOffX;
+  const cy = edH / 2 + edOffY;
+
+  edCtx.save();
+  edCtx.drawImage(edImg, cx - drawW/2, cy - drawH/2, drawW, drawH);
+  edCtx.restore();
+
+  // Frame border overlay — shows exact crop boundary
+  edCtx.save();
+  edCtx.strokeStyle = 'rgba(200,240,85,0.9)';
+  edCtx.lineWidth = 2;
+  edCtx.setLineDash([8, 5]);
+  edCtx.strokeRect(2, 2, edW-4, edH-4);
+  edCtx.setLineDash([]);
+
+  // Corner marks
+  const m = 18;
+  edCtx.strokeStyle = var_accent();
+  edCtx.lineWidth = 3;
+  edCtx.setLineDash([]);
+  [[0,0,1,0],[0,0,0,1],[edW,0,-1,0],[edW,0,0,1],
+   [0,edH,1,0],[0,edH,0,-1],[edW,edH,-1,0],[edW,edH,0,-1]]
+  .forEach(([x,y,dx,dy]) => {
+    edCtx.beginPath();
+    edCtx.moveTo(x + dx*2, y + dy*2);
+    edCtx.lineTo(x + dx*m, y + dy*m);
+    edCtx.stroke();
+  });
+
+  // Centre crosshair hint
+  edCtx.strokeStyle = 'rgba(200,240,85,0.25)';
+  edCtx.lineWidth = 1;
+  edCtx.setLineDash([4,4]);
+  edCtx.beginPath(); edCtx.moveTo(edW/2,0); edCtx.lineTo(edW/2,edH); edCtx.stroke();
+  edCtx.beginPath(); edCtx.moveTo(0,edH/2); edCtx.lineTo(edW,edH/2); edCtx.stroke();
+  edCtx.restore();
+}
+
+function var_accent() { return '#c8f055'; }
+
+// Mouse drag
+function edMouseDown(e) {
+  edDragging = true;
+  edDragStartX  = e.clientX;
+  edDragStartY  = e.clientY;
+  edDragOriginX = edOffX;
+  edDragOriginY = edOffY;
+}
+function edMouseMove(e) {
+  if (!edDragging) return;
+  edOffX = edDragOriginX + (e.clientX - edDragStartX);
+  edOffY = edDragOriginY + (e.clientY - edDragStartY);
+  drawEditor();
+}
+function edMouseUp() { edDragging = false; }
+
+// Touch drag
+let touchStartX, touchStartY;
+function edTouchStart(e) {
+  e.preventDefault();
+  edDragging = true;
+  touchStartX   = e.touches[0].clientX;
+  touchStartY   = e.touches[0].clientY;
+  edDragOriginX = edOffX;
+  edDragOriginY = edOffY;
+}
+function edTouchMove(e) {
+  e.preventDefault();
+  if (!edDragging) return;
+  edOffX = edDragOriginX + (e.touches[0].clientX - touchStartX);
+  edOffY = edDragOriginY + (e.touches[0].clientY - touchStartY);
+  drawEditor();
+}
+
+// Scroll to zoom
+function edWheel(e) {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.05 : 0.05;
+  edZoom = Math.min(3, Math.max(0.3, edZoom + delta));
+  document.getElementById('zoomSlider').value = Math.round(edZoom * 100);
+  document.getElementById('zoomVal').textContent = Math.round(edZoom * 100) + '%';
+  drawEditor();
+}
+
+function onZoom(val) {
+  edZoom = val / 100;
+  document.getElementById('zoomVal').textContent = val + '%';
+  drawEditor();
+}
+
+function resetPosition() {
+  edOffX = 0; edOffY = 0; edZoom = 1;
+  document.getElementById('zoomSlider').value = 100;
+  document.getElementById('zoomVal').textContent = '100%';
+  drawEditor();
+}
+
+function closeEditor() {
+  document.getElementById('editorModal').style.display = 'none';
+  editorIdx = -1;
+}
+
+function closeEditorOnBg(e) {
+  if (e.target === document.getElementById('editorModal')) closeEditor();
 }
 
 function applyPosition() {
   if (editorIdx < 0) return;
-  
+
   images[editorIdx].offsetX = edOffX;
   images[editorIdx].offsetY = edOffY;
-  images[editorIdx].zoom = edZoom;
-  
+  images[editorIdx].zoom    = edZoom;
+
+  // Bake ONLY the positioned image — NO background color burned in
+  // Background color is always applied at draw/export time so it can change freely
+  const bakeW = 1200, bakeH = Math.round(1200 * (photoSize.h / photoSize.w));
+  const bakeCanvas = document.createElement('canvas');
+  bakeCanvas.width  = bakeW;
+  bakeCanvas.height = bakeH;
+  const bCtx = bakeCanvas.getContext('2d');
+
+  // Transparent background — color applied separately at render time
+  bCtx.clearRect(0, 0, bakeW, bakeH);
+
+  const scaleX = bakeW / edW;
+  const scaleY = bakeH / edH;
+  const baseScale = Math.min(edW / edImg.width, edH / edImg.height);
+  const scale = baseScale * edZoom;
+  const drawW = edImg.width  * scale * scaleX;
+  const drawH = edImg.height * scale * scaleY;
+  const cx = bakeW/2 + edOffX * scaleX;
+  const cy = bakeH/2 + edOffY * scaleY;
+  bCtx.drawImage(edImg, cx - drawW/2, cy - drawH/2, drawW, drawH);
+
+  // Store as PNG (preserves transparency)
+  images[editorIdx].baked = bakeCanvas.toDataURL('image/png');
+
   closeEditor();
   renderGrid();
   refreshPreview();
-}
-async function generatePDF() {
-  if (!images.length) {
-    toast('Upload at least one image first', 'err');
-    return;
-  }
-
-  const button = document.getElementById('pdfBtn');
-  button.disabled = true;
-  button.textContent = '⏳ Generating PDF...';
-
-  try {
-    const page = getPageMM();
-    const border = document.getElementById('tBorder').classList.contains('on');
-    const guides = document.getElementById('tGuides').classList.contains('on');
-    const repeat = document.getElementById('tRepeat').classList.contains('on');
-    
-    const pdf = new jsPDF({
-      orientation: page.h > page.w ? 'portrait' : 'landscape',
-      unit: 'mm',
-      format: [page.w, page.h]
-    });
-
-    let imageList = [...images];
-    if (repeat && imageList.length > 0) {
-      while (imageList.length < layout.total) imageList.push(imageList[0]);
-    }
-
-    const pagesNeeded = Math.ceil(imageList.length / layout.total);
-    const pw = photoSize.w, ph = photoSize.h, gap = 3;
-    const totalW = layout.cols * pw + (layout.cols - 1) * gap;
-    const totalH = layout.rows * ph + (layout.rows - 1) * gap;
-    const startX = (page.w - totalW) / 2;
-    const startY = (page.h - totalH) / 2;
-
-    for (let pageNum = 0; pageNum < pagesNeeded; pageNum++) {
-      if (pageNum > 0) pdf.addPage();
-      
-      const pageImages = imageList.slice(pageNum * layout.total, (pageNum + 1) * layout.total);
-      
-      for (let i = 0; i < pageImages.length; i++) {
-        const row = Math.floor(i / layout.cols);
-        const col = i % layout.cols;
-        const x = startX + col * (pw + gap);
-        const y = startY + row * (ph + gap);
-        
-        if (pageImages[i]) {
-          const imgData = pageImages[i].baked || pageImages[i].processed;
-          await addImageToPDF(pdf, imgData, x, y, pw, ph, border);
-        }
-        
-        if (border) {
-          pdf.setDrawColor(200, 200, 200);
-          pdf.setLineWidth(0.3);
-          pdf.rect(x, y, pw, ph);
-        }
-      }
-    }
-
-    pdf.save(`photoprint-${Date.now()}.pdf`);
-    toast('PDF downloaded successfully!', 'ok');
-  } catch (error) {
-    toast(`Error: ${error.message}`, 'err');
-  }
-
-  button.disabled = false;
-  button.textContent = '⬇ Download PDF';
+  toast('Position applied ✓');
 }
 
-function addImageToPDF(pdf, imageUrl, x, y, w, h, hasBorder) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const dpi = 300;
-      const mmToPx = dpi / 25.4;
-      const pxW = Math.round(w * mmToPx);
-      const pxH = Math.round(h * mmToPx);
-      
-      const canvas = document.createElement('canvas');
-      canvas.width = pxW;
-      canvas.height = pxH;
-      const ctx = canvas.getContext('2d');
-      
-      if (selectedColor !== 'transparent') {
-        ctx.fillStyle = selectedColor;
-        ctx.fillRect(0, 0, pxW, pxH);
-      }
-      
-      const borderPx = hasBorder ? Math.round(dpi / 25.4) : 0;
-      const drawW = pxW - 2 * borderPx;
-      const drawH = pxH - 2 * borderPx;
-      
-      const imgAspect = img.width / img.height;
-      const targetAspect = drawW / drawH;
-      
-      let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
-      if (imgAspect > targetAspect) {
-        srcW = img.height * targetAspect;
-        srcX = (img.width - srcW) / 2;
-      } else {
-        srcH = img.width / targetAspect;
-        srcY = (img.height - srcH) / 2;
-      }
-      
-      ctx.drawImage(img, srcX, srcY, srcW, srcH, borderPx, borderPx, drawW, drawH);
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', x, y, w, h);
-      resolve();
-    };
-    img.src = imageUrl;
-  });
-}
-
-function toast(message, type = 'ok') {
-  const toastEl = document.getElementById('toast');
-  toastEl.className = type;
-  toastEl.innerHTML = `${type === 'ok' ? '✅' : '⚠️'} <span>${message}</span>`;
-  toastEl.style.display = 'flex';
-  setTimeout(() => toastEl.style.display = 'none', 3500);
-} 
-
-function initToggles() {
-  const toggles = ['tBorder', 'tGuides', 'tRepeat'];
-  toggles.forEach(id => {
-    const toggle = document.getElementById(id);
-    if (toggle) {
-      toggle.addEventListener('click', () => toggle.classList.toggle('on'));
-    }
-  });
-}
-
-// Call this on page load
-document.addEventListener('DOMContentLoaded', () => {
-  initToggles();
-  checkServer();
-  updateSummary();
-});
-// Final integration: Put it all together
-document.addEventListener('DOMContentLoaded', () => {
-  // Initialize all event listeners
-  initFileUpload();
-  initToggles();
-  initColorPicker();
-  checkServer();
-  updateSummary();
-  
-  // Refresh preview when settings change
-  document.getElementById('pageSize').addEventListener('change', refreshPreview);
-  document.getElementById('tBorder').addEventListener('click', refreshPreview);
-  document.getElementById('tGuides').addEventListener('click', refreshPreview);
-});
-
-function initFileUpload() {
-  const fileInput = document.getElementById('fileInput');
-  const zone = document.getElementById('zone');
-  
-  fileInput.addEventListener('change', (e) => loadFiles(Array.from(e.target.files)));
-  
-  zone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    zone.classList.add('drag-over');
-  });
-  
-  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-  
-  zone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    zone.classList.remove('drag-over');
-    loadFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
-  });
-}
-
-function initColorPicker() {
-  const swatches = document.querySelectorAll('.swatch');
-  swatches.forEach(swatch => {
-    swatch.addEventListener('click', () => pickColor(swatch));
-  });
-  
-  const customColor = document.getElementById('customColor');
-  if (customColor) {
-    customColor.addEventListener('change', (e) => pickCustomColor(e.target.value));
-  }
-}
+// ── init
+updateSummary();
 </script>
+</body>
 </html>
