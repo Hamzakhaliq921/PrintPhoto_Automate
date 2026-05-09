@@ -373,5 +373,74 @@ async function removeBackgrounds() {
   renderGrid();
   refreshPreview();
 }
+// Step 9: Add drag-to-reposition editor with zoom
+
+let editorIdx = -1;
+let edImg = null;
+let edOffX = 0, edOffY = 0;
+let edZoom = 1;
+let edDragging = false;
+
+function openEditor(index) {
+  editorIdx = index;
+  const img = images[index];
+  edOffX = img.offsetX || 0;
+  edOffY = img.offsetY || 0;
+  edZoom = img.zoom || 1;
+  
+  document.getElementById('zoomSlider').value = Math.round(edZoom * 100);
+  document.getElementById('zoomVal').textContent = `${Math.round(edZoom * 100)}%`;
+  
+  const canvas = document.getElementById('editorCanvas');
+  const aspect = photoSize.h / photoSize.w;
+  canvas.width = 420;
+  canvas.height = Math.round(420 * aspect);
+  
+  edImg = new Image();
+  edImg.onload = () => drawEditor();
+  edImg.src = img.processed;
+  
+  document.getElementById('editorModal').style.display = 'flex';
+}
+
+function drawEditor() {
+  const canvas = document.getElementById('editorCanvas');
+  const ctx = canvas.getContext('2d');
+  if (!edImg) return;
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw background
+  ctx.fillStyle = selectedColor;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw image with zoom and offset
+  const baseScale = Math.min(canvas.width / edImg.width, canvas.height / edImg.height);
+  const scale = baseScale * edZoom;
+  const drawW = edImg.width * scale;
+  const drawH = edImg.height * scale;
+  const cx = canvas.width / 2 + edOffX;
+  const cy = canvas.height / 2 + edOffY;
+  
+  ctx.drawImage(edImg, cx - drawW/2, cy - drawH/2, drawW, drawH);
+  
+  // Draw crop frame
+  ctx.strokeStyle = '#c8f055';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 5]);
+  ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+}
+
+function applyPosition() {
+  if (editorIdx < 0) return;
+  
+  images[editorIdx].offsetX = edOffX;
+  images[editorIdx].offsetY = edOffY;
+  images[editorIdx].zoom = edZoom;
+  
+  closeEditor();
+  renderGrid();
+  refreshPreview();
+}
 </script>
 </html>
