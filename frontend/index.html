@@ -113,4 +113,75 @@
     </div>
   </div>
 </body>
+// Step 2: Add image upload with drag & drop support
+// Add this script after the HTML structure
+
+<script>
+let images = []; // Array to store uploaded images
+
+// DOM Elements
+const fileInput = document.getElementById('fileInput');
+const zone = document.getElementById('zone');
+const imgGrid = document.getElementById('imgGrid');
+
+// File upload handler
+fileInput.addEventListener('change', (e) => loadFiles(Array.from(e.target.files)));
+
+// Drag & drop handlers
+zone.addEventListener('dragover', (e) => { 
+  e.preventDefault(); 
+  zone.classList.add('drag-over'); 
+});
+
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+
+zone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  loadFiles(files);
+});
+
+function loadFiles(files) {
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      images.push({
+        id: Date.now() + Math.random(),
+        src: e.target.result,
+        processed: e.target.result,
+        name: file.name,
+        bgDone: false
+      });
+      renderGrid();
+      updateSummary();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderGrid() {
+  imgGrid.innerHTML = '';
+  images.forEach((img, i) => {
+    const card = document.createElement('div');
+    card.className = 'img-card';
+    card.innerHTML = `
+      <img src="${img.processed}" />
+      <button class="del" onclick="deleteImage(${i})">✕</button>
+      <span class="state-badge raw">original</span>
+    `;
+    imgGrid.appendChild(card);
+  });
+}
+
+function deleteImage(i) {
+  images.splice(i, 1);
+  renderGrid();
+  updateSummary();
+}
+
+function updateSummary() {
+  document.getElementById('sImgs').textContent = images.length;
+}
+</script>
 </html>
