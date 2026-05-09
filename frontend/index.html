@@ -263,7 +263,6 @@ async function generatePDF() {
     format: [page.w, page.h]
   });
 
-  // Basic PDF generation
   pdf.save(`photoprint-${Date.now()}.pdf`);
   alert('PDF generated!');
 }
