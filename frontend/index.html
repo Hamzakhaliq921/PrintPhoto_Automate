@@ -183,5 +183,25 @@ function deleteImage(i) {
 function updateSummary() {
   document.getElementById('sImgs').textContent = images.length;
 }
+// Step 3: Add photo size selection functionality
+
+let photoSize = { w: 35, h: 45, name: 'Passport' };
+
+function pickSize(el) {
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  photoSize = {
+    w: parseFloat(el.dataset.w),
+    h: parseFloat(el.dataset.h),
+    name: el.dataset.name
+  };
+  updateSummary();
+}
+
+// Update summary with size info
+function updateSummary() {
+  document.getElementById('sImgs').textContent = images.length;
+  document.getElementById('sSize').textContent = `${photoSize.w} × ${photoSize.h} mm`;
+}
 </script>
 </html>
