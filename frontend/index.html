@@ -440,5 +440,125 @@ function applyPosition() {
   renderGrid();
   refreshPreview();
 }
+// Step 10: Final PDF generation with all features
+
+async function generatePDF() {
+  if (!images.length) {
+    toast('Upload at least one image first', 'err');
+    return;
+  }
+
+  const button = document.getElementById('pdfBtn');
+  button.disabled = true;
+  button.textContent = '⏳ Generating PDF...';
+
+  try {
+    const page = getPageMM();
+    const border = document.getElementById('tBorder').classList.contains('on');
+    const guides = document.getElementById('tGuides').classList.contains('on');
+    const repeat = document.getElementById('tRepeat').classList.contains('on');
+    
+    const pdf = new jsPDF({
+      orientation: page.h > page.w ? 'portrait' : 'landscape',
+      unit: 'mm',
+      format: [page.w, page.h]
+    });
+
+    let imageList = [...images];
+    if (repeat && imageList.length > 0) {
+      while (imageList.length < layout.total) imageList.push(imageList[0]);
+    }
+
+    const pagesNeeded = Math.ceil(imageList.length / layout.total);
+    const pw = photoSize.w, ph = photoSize.h, gap = 3;
+    const totalW = layout.cols * pw + (layout.cols - 1) * gap;
+    const totalH = layout.rows * ph + (layout.rows - 1) * gap;
+    const startX = (page.w - totalW) / 2;
+    const startY = (page.h - totalH) / 2;
+
+    for (let pageNum = 0; pageNum < pagesNeeded; pageNum++) {
+      if (pageNum > 0) pdf.addPage();
+      
+      const pageImages = imageList.slice(pageNum * layout.total, (pageNum + 1) * layout.total);
+      
+      for (let i = 0; i < pageImages.length; i++) {
+        const row = Math.floor(i / layout.cols);
+        const col = i % layout.cols;
+        const x = startX + col * (pw + gap);
+        const y = startY + row * (ph + gap);
+        
+        if (pageImages[i]) {
+          const imgData = pageImages[i].baked || pageImages[i].processed;
+          await addImageToPDF(pdf, imgData, x, y, pw, ph, border);
+        }
+        
+        if (border) {
+          pdf.setDrawColor(200, 200, 200);
+          pdf.setLineWidth(0.3);
+          pdf.rect(x, y, pw, ph);
+        }
+      }
+    }
+
+    pdf.save(`photoprint-${Date.now()}.pdf`);
+    toast('PDF downloaded successfully!', 'ok');
+  } catch (error) {
+    toast(`Error: ${error.message}`, 'err');
+  }
+
+  button.disabled = false;
+  button.textContent = '⬇ Download PDF';
+}
+
+function addImageToPDF(pdf, imageUrl, x, y, w, h, hasBorder) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const dpi = 300;
+      const mmToPx = dpi / 25.4;
+      const pxW = Math.round(w * mmToPx);
+      const pxH = Math.round(h * mmToPx);
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = pxW;
+      canvas.height = pxH;
+      const ctx = canvas.getContext('2d');
+      
+      if (selectedColor !== 'transparent') {
+        ctx.fillStyle = selectedColor;
+        ctx.fillRect(0, 0, pxW, pxH);
+      }
+      
+      const borderPx = hasBorder ? Math.round(dpi / 25.4) : 0;
+      const drawW = pxW - 2 * borderPx;
+      const drawH = pxH - 2 * borderPx;
+      
+      const imgAspect = img.width / img.height;
+      const targetAspect = drawW / drawH;
+      
+      let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
+      if (imgAspect > targetAspect) {
+        srcW = img.height * targetAspect;
+        srcX = (img.width - srcW) / 2;
+      } else {
+        srcH = img.width / targetAspect;
+        srcY = (img.height - srcH) / 2;
+      }
+      
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, borderPx, borderPx, drawW, drawH);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', x, y, w, h);
+      resolve();
+    };
+    img.src = imageUrl;
+  });
+}
+
+function toast(message, type = 'ok') {
+  const toastEl = document.getElementById('toast');
+  toastEl.className = type;
+  toastEl.innerHTML = `${type === 'ok' ? '✅' : '⚠️'} <span>${message}</span>`;
+  toastEl.style.display = 'flex';
+  setTimeout(() => toastEl.style.display = 'none', 3500);
+} 
 </script>
 </html>
