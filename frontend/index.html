@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PhotoPrint Pro — Passport & ID Photo Generator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <style>
     /* Basic reset and CSS variables */
@@ -239,6 +240,34 @@ function pickCustomColor(hex) {
   document.querySelectorAll('.swatch').forEach(s => s.classList.remove('sel'));
   document.querySelector('.swatch-custom').classList.add('sel');
   document.getElementById('colorLabel').textContent = `Selected: Custom (${hex})`;
+}
+<!-- Step 6: Add jsPDF library and basic PDF export -->
+
+const { jsPDF } = window.jspdf;
+
+function getPageMM() {
+  const value = document.getElementById('pageSize').value;
+  if (value === 'A4') return { w: 210, h: 297 };
+  if (value === 'Letter') return { w: 216, h: 279 };
+  return { w: 148, h: 210 };
+}
+
+async function generatePDF() {
+  if (!images.length) {
+    alert('Upload at least one image first');
+    return;
+  }
+
+  const page = getPageMM();
+  const pdf = new jsPDF({
+    orientation: page.h > page.w ? 'portrait' : 'landscape',
+    unit: 'mm',
+    format: [page.w, page.h]
+  });
+
+  // Basic PDF generation
+  pdf.save(`photoprint-${Date.now()}.pdf`);
+  alert('PDF generated!');
 }
 </script>
 </html>
