@@ -314,5 +314,64 @@ function drawPreview() {
     ctx.strokeRect(x, y, pw, ph);
   }
 }
+// Step 8: Add background removal API integration
+
+const SERVER = 'http://localhost:5000';
+
+async function checkServer() {
+  const dot = document.getElementById('dot');
+  const text = document.getElementById('status-text');
+  try {
+    const response = await fetch(`${SERVER}/health`, { signal: AbortSignal.timeout(3000) });
+    if (response.ok) {
+      dot.className = 'status-dot online';
+      text.textContent = 'AI Ready';
+      return true;
+    }
+  } catch {}
+  dot.className = 'status-dot offline';
+  text.textContent = 'AI Offline';
+  return false;
+}
+
+async function removeBackgrounds() {
+  if (!images.length) {
+    alert('Upload images first');
+    return;
+  }
+
+  const online = await checkServer();
+  if (!online) {
+    alert('Background removal server is offline');
+    return;
+  }
+
+  const button = document.getElementById('removeBgBtn');
+  button.disabled = true;
+  button.textContent = 'Processing...';
+
+  for (let i = 0; i < images.length; i++) {
+    try {
+      const response = await fetch(`${SERVER}/remove-bg`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: images[i].src })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        images[i].processed = data.image_base64;
+        images[i].bgDone = true;
+      }
+    } catch (error) {
+      console.error('Background removal failed:', error);
+    }
+  }
+
+  button.disabled = false;
+  button.textContent = '✨ Remove Backgrounds';
+  renderGrid();
+  refreshPreview();
+}
 </script>
 </html>
