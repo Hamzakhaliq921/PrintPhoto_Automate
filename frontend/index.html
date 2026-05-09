@@ -1,0 +1,117 @@
+<!-- Step 1: Basic HTML structure and CSS framework -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhotoPrint Pro — Passport & ID Photo Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Basic reset and CSS variables */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0e0f;
+      --surface: #1a1a1c;
+      --surface2: #242427;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.15);
+      --text: #f0ede8;
+      --muted: #888580;
+      --accent: #c8f055;
+      --danger: #ff5e5e;
+      --radius: 12px;
+      --radius-lg: 18px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Header styles */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 40px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(14,14,15,0.92);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+    }
+    .logo span { color: var(--text); }
+
+    /* Layout grid */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 0;
+      min-height: calc(100vh - 65px);
+    }
+
+    .main-col {
+      padding: 32px 40px;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+    }
+
+    .side-col {
+      padding: 28px 28px;
+      overflow-y: auto;
+      background: var(--surface);
+    }
+
+    /* Section titles */
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .section { margin-bottom: 36px; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .side-col { border-top: 1px solid var(--border); }
+      header { padding: 16px 20px; }
+      .main-col { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Photo<span>Print</span> Pro</div>
+    <div class="server-status" id="aiStatusBadge">
+      <div class="status-dot" id="dot"></div>
+      <span id="status-text">AI Ready</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="main-col">
+      <!-- Content will go here -->
+    </div>
+    <div class="side-col">
+      <!-- Sidebar will go here -->
+    </div>
+  </div>
+</body>
+</html>
