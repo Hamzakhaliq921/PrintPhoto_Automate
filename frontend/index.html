@@ -268,5 +268,53 @@ async function generatePDF() {
   pdf.save(`photoprint-${Date.now()}.pdf`);
   alert('PDF generated!');
 }
+
+// Step 7: Add canvas preview of photo layout
+
+function refreshPreview() {
+  if (!images.length) return;
+  const wrap = document.getElementById('prevWrap');
+  wrap.innerHTML = '<canvas id="previewCanvas"></canvas>';
+  drawPreview();
+}
+
+function drawPreview() {
+  const canvas = document.getElementById('previewCanvas');
+  if (!canvas) return;
+  
+  const page = getPageMM();
+  const scale = 2.2; // Preview scale
+  const border = document.getElementById('tBorder').classList.contains('on');
+  
+  canvas.width = page.w * scale;
+  canvas.height = page.h * scale;
+  const ctx = canvas.getContext('2d');
+  
+  // Draw white background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Calculate grid positions
+  const pw = photoSize.w * scale;
+  const ph = photoSize.h * scale;
+  const gap = 3 * scale;
+  const totalW = layout.cols * pw + (layout.cols - 1) * gap;
+  const totalH = layout.rows * ph + (layout.rows - 1) * gap;
+  const startX = (canvas.width - totalW) / 2;
+  const startY = (canvas.height - totalH) / 2;
+  
+  // Draw placeholder rectangles
+  for (let i = 0; i < layout.total && i < images.length; i++) {
+    const row = Math.floor(i / layout.cols);
+    const col = i % layout.cols;
+    const x = startX + col * (pw + gap);
+    const y = startY + row * (ph + gap);
+    
+    ctx.fillStyle = selectedColor;
+    ctx.fillRect(x, y, pw, ph);
+    ctx.strokeStyle = '#ddd';
+    ctx.strokeRect(x, y, pw, ph);
+  }
+}
 </script>
 </html>
