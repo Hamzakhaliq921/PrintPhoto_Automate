@@ -203,5 +203,24 @@ function updateSummary() {
   document.getElementById('sImgs').textContent = images.length;
   document.getElementById('sSize').textContent = `${photoSize.w} × ${photoSize.h} mm`;
 }
+// Step 4: Add layout configuration (photos per page)
+
+let layout = { total: 4, cols: 2, rows: 2 };
+
+function pickLayout(el, total, cols, rows) {
+  document.querySelectorAll('.lay-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  layout = { total, cols, rows };
+  updateSummary();
+}
+
+function updateSummary() {
+  document.getElementById('sImgs').textContent = images.length;
+  document.getElementById('sSize').textContent = `${photoSize.w} × ${photoSize.h} mm`;
+  document.getElementById('sLay').textContent = `${layout.total} per page`;
+  
+  const pagesNeeded = images.length > 0 ? Math.ceil(images.length / layout.total) : 0;
+  document.getElementById('sPages').textContent = pagesNeeded || '—';
+}
 </script>
 </html>
