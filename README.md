@@ -1,5 +1,8 @@
 # PhotoPrint Pro 📸
 
+https://github.com/user-attachments/assets/d4dabe0c-f7f3-4f4b-9f27-22f4e785be2f
+
+
 Automated passport & ID photo layout generator with **free, offline AI background removal** powered by [rembg](https://github.com/danielgatis/rembg).
 
 ---
